@@ -8,12 +8,12 @@ from ..utils import logging
 # logger = logging.get_logger(__name__)
 
 class Config(object):
-    def __init__(self, load=True, cfg_dict=None, cfg_level=None):
+    def __init__(self, config_file, load=True, cfg_dict=None, cfg_level=None):
         self._level = "cfg" + ("." + cfg_level if cfg_level is not None else "")
         
         current_directory = os.path.dirname(os.path.abspath(__file__))
         parent_directory = os.path.dirname(current_directory)
-        self.config_file_loc = os.path.join(parent_directory, 'configs/UniAnimate_infer.yaml')
+        self.config_file_loc = os.path.join(parent_directory, config_file)
 
         if load:
             self.args = self._parse_args()
@@ -24,7 +24,7 @@ class Config(object):
             cfg_dict = self._merge_cfg_from_base(cfg_base, cfg_dict)
             cfg_dict = self._update_from_args(cfg_dict)
             self.cfg_dict = cfg_dict
-        self._update_dict(cfg_dict)
+        self._update_dict(config_file, cfg_dict)
     
     def _parse_args(self):
         parser = argparse.ArgumentParser(
@@ -54,6 +54,64 @@ class Config(object):
             default=False, 
             help='Indicates if the build is a standalone build for Windows'
         )
+
+
+
+        # New Command Line Arguments
+        parser.add_argument("--listen", type=str, default="127.0.0.1", metavar="IP", nargs="?", const="0.0.0.0", help="Specify the IP address to listen on (default: 127.0.0.1). If --listen is provided without an argument, it defaults to 0.0.0.0. (listens on all)")
+        parser.add_argument("--port", type=int, default=8188, help="Set the listen port.")
+        parser.add_argument("--tls-keyfile", type=str, help="Path to TLS (SSL) key file. Enables TLS, makes app accessible at https://... requires --tls-certfile to function")
+        parser.add_argument("--tls-certfile", type=str, help="Path to TLS (SSL) certificate file. Enables TLS, makes app accessible at https://... requires --tls-keyfile to function")
+        parser.add_argument("--enable-cors-header", type=str, default=None, metavar="ORIGIN", nargs="?", const="*", help="Enable CORS (Cross-Origin Resource Sharing) with optional origin or allow all with default '*'.")
+        parser.add_argument("--max-upload-size", type=float, default=100, help="Set the maximum upload size in MB.")
+
+        parser.add_argument("--extra-model-paths-config", type=str, default=None, metavar="PATH", nargs='+', action='append', help="Load one or more extra_model_paths.yaml files.")
+        parser.add_argument("--output-directory", type=str, default=None, help="Set the ComfyUI output directory.")
+        parser.add_argument("--temp-directory", type=str, default=None, help="Set the ComfyUI temp directory (default is in the ComfyUI directory).")
+        parser.add_argument("--input-directory", type=str, default=None, help="Set the ComfyUI input directory.")
+        parser.add_argument("--auto-launch", action="store_true", help="Automatically launch ComfyUI in the default browser.")
+        parser.add_argument("--disable-auto-launch", action="store_true", help="Disable auto launching the browser.")
+        parser.add_argument("--cuda-device", type=int, default=None, metavar="DEVICE_ID", help="Set the id of the cuda device this instance will use.")
+        parser.add_argument("--force-channels-last", action="store_true", help="Force channels last format when inferencing the models.")
+
+        parser.add_argument("--directml", type=int, nargs="?", metavar="DIRECTML_DEVICE", const=-1, help="Use torch-directml.")
+
+        parser.add_argument("--disable-ipex-optimize", action="store_true", help="Disables ipex.optimize when loading models with Intel GPUs.")
+        parser.add_argument("--disable-xformers", action="store_true", help="Disable xformers.")
+        parser.add_argument("--default-hashing-function", type=str, choices=['md5', 'sha1', 'sha256', 'sha512'], default='sha256', help="Allows you to choose the hash function to use for duplicate filename / contents comparison. Default is sha256.")
+
+        parser.add_argument("--disable-smart-memory", action="store_true", help="Force ComfyUI to agressively offload to regular ram instead of keeping models in vram when it can.")
+        parser.add_argument("--deterministic", action="store_true", help="Make pytorch use slower deterministic algorithms when it can. Note that this might not make images deterministic in all cases.")
+
+        parser.add_argument("--dont-print-server", action="store_true", help="Don't print server output.")
+        parser.add_argument("--quick-test-for-ci", action="store_true", help="Quick test for CI.")
+        # parser.add_argument("--windows-standalone-build", action="store_true", help="Windows standalone build: Enable convenient things that most people using the standalone windows build will probably enjoy (like auto opening the page on startup).")
+
+        parser.add_argument("--disable-metadata", action="store_true", help="Disable saving prompt metadata in files.")
+        parser.add_argument("--disable-all-custom-nodes", action="store_true", help="Disable loading all custom nodes.")
+
+        parser.add_argument("--multi-user", action="store_true", help="Enables per-user storage.")
+
+        parser.add_argument("--verbose", action="store_true", help="Enables more debug prints.")
+        # The default built-in provider hosted under web/
+        DEFAULT_VERSION_STRING = "comfyanonymous/ComfyUI@latest"
+
+        parser.add_argument(
+            "--front-end-version",
+            type=str,
+            default=DEFAULT_VERSION_STRING,
+            help="""
+            Specifies the version of the frontend to be used. This command needs internet connectivity to query and
+            download available frontend implementations from GitHub releases.
+
+            The version string should be in the format of:
+            [repoOwner]/[repoName]@[version]
+            where version is one of: "latest" or a valid version number (e.g. "1.0.0")
+            """,
+        )
+        # End of New Command Line Arguments
+
+        
         parser.add_argument(
             "opts",
             help="Other configurations",
@@ -214,10 +272,10 @@ class Config(object):
                 cfg[key_split[0]][key_split[1]][key_split[2]][key_split[3]] = vals[idx]
         return cfg
     
-    def _update_dict(self, cfg_dict):
+    def _update_dict(self, config_file, cfg_dict):
         def recur(key, elem):
             if type(elem) is dict:
-                return key, Config(load=False, cfg_dict=elem, cfg_level=key)
+                return key, Config(config_file, load=False, cfg_dict=elem, cfg_level=key)
             else:
                 if type(elem) is str and elem[1:3]=="e-":
                     elem = float(elem)
