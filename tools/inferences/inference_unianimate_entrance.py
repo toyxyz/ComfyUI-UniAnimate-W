@@ -204,6 +204,18 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
     cfg.rank = cfg.pmi_rank * cfg.gpus_per_machine + gpu
     setup_seed(cfg.seed + cfg.rank)
 
+    def is_libuv_supported():
+        build_info = torch.__config__.show()
+        return 'USE_LIBUV' in build_info
+    
+    try:
+        if not is_libuv_supported():
+            print("libuv is not supported, disabling USE_LIBUV")
+            os.environ["USE_LIBUV"] = "0"
+    except Exception as e:
+        print(f"Unexpected error occured: {e}")
+        os.environ["USE_LIBUV"] = "0"
+
     if not cfg.debug:
         torch.cuda.set_device(gpu)
         torch.backends.cudnn.benchmark = True
@@ -238,13 +250,13 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
 
     # [Data] Data Transform    
     train_trans = data.Compose([
-        data.Resize(cfg.resolution),
+        data.Resize(resolution),
         data.ToTensor(),
         data.Normalize(mean=cfg.mean, std=cfg.std)
         ])
 
     train_trans_pose = data.Compose([
-        data.Resize(cfg.resolution),
+        data.Resize(resolution),
         data.ToTensor(),
         ]
         )
@@ -403,7 +415,7 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
         # logging.info(f"Current seed {cur_seed} ...")
 
         print(f"Number of frames to denoise: {frames_num}")
-        noise = torch.randn([1, 4, frames_num, int(cfg.resolution[1]/cfg.scale), int(cfg.resolution[0]/cfg.scale)])
+        noise = torch.randn([1, 4, frames_num, int(resolution[1]/cfg.scale), int(resolution[0]/cfg.scale)])
         noise = noise.to(gpu)      
         # print(f"noise: {noise.shape}")
 
@@ -477,11 +489,14 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
             
             if hasattr(cfg, "CPU_CLIP_VAE") and cfg.CPU_CLIP_VAE:
                 clip_encoder.cpu() # add this line
+                del clip_encoder  # Delete this object to free memory
                 autoencoder.cpu() # add this line
                 torch.cuda.empty_cache() # add this line
+                import gc
+                gc.collect()
 
             # print(f' noise_one is ({noise_one})')
-
+            print(f"noise: {noise.shape}")
                 
             video_data = diffusion.ddim_sample_loop(
                 noise=noise_one,
@@ -495,8 +510,12 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
             
             if hasattr(cfg, "CPU_CLIP_VAE") and cfg.CPU_CLIP_VAE:
                 # if run forward of  autoencoder or clip_encoder second times, load them again
-                clip_encoder.cuda()
+                # clip_encoder.cuda()
+                del diffusion
+                torch.cuda.empty_cache()
+                gc.collect()
                 autoencoder.cuda()
+
             video_data = 1. / cfg.scale_factor * video_data 
             video_data = rearrange(video_data, 'b c f h w -> (b f) c h w')
             chunk_size = min(cfg.decoder_bs, video_data.shape[0])

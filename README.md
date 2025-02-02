@@ -3,29 +3,55 @@
 
 <div align="center">
 
+<h2>UniAnimate</h2>
 <img src="gif.gif" />
 
-## ComfyUi-windows implementation for the image animation project -> UniAnimate: Taming Unified Video Diffusion Models for Consistent Human Image Animation
+<h2>Animate-X</h2>
+<img src="catDanceGif.gif" width='1152' />
 
+## ComfyUI-Windows implementation of the image animation projects: UniAnimate & Animate-X
 [🎨 UniAnimate Project Page](https://unianimate.github.io/)
 
+[🎨 Animate-x Project Page](https://lucaria-academy.github.io/Animate-X/)
 </div>
+
+## Updates
+
+28/01/2025: You can now download all the checkpoints needed to run UniAnimate & Animate-X [here](https://huggingface.co/Isi99999/UniAnimate_and_Animate-X_Models/tree/main).
+
+18/01/2025: Released a [video](https://youtu.be/FpxT9EdphOE) to help users learn how to address pose adherence issues in Animate-X with a simple workaround.
+
+30/12/2024: Added a version 2 node for animate-x named `Animate image with Animate_X_v2`. In addition to the Explicit Pose Indicator (EPI), the Implicit Pose Indicator (IPI) mentioned in the animate-x paper was implemented in this node and it provides a slight improvement over the previous animate-x nodes in resulting videos. Also added a `Repose image with Animate_X_v2` node which did not show much improvement over the `Repose image with Animate_X` node in image to image pose transfer tests. The `Repose image with UniAnimate` node is much better for image to image pose transfer.
+
+24/12/2024: Added a new node for dwpose extraction named `Generate dwpose`. The advantage of this node over the `Align & Generate poses for UniAnimate`node is that it does not throw an error when the target image cannot be read by the DWposeDetector, allowing the generation to proceed. But note that both nodes will not work and might throw a 'cannot convert float infinity to integer' error if the driving video or image cannot be read. The downside is that the output dwpose is not aligned with the target image like the `Align & Generate poses for UniAnimate`node attempts to do. To achieve a result where body proportions are maintained, you must manually align the person in the target image with the person in the driving video or image before uploading them. Also note that the `Generate dwpose` and `Align & Generate poses for UniAnimate`nodes are only needed by the `Animate image with Animate_X` and `Animate image with UniAnimate` nodes. You can achieve similar effects of the `Generate dwpose` and `Align & Generate poses for UniAnimate` nodes in the other nodes by setting the dontAlignPose parameter to True and False respectively.
+
+20/12/2024: Added seperate config and UNET files for Animate-X to solve error identified in [issue #22](https://github.com/Isi-dev/ComfyUI-UniAnimate-W/issues/22)
+
+17/12/2024: Released a [video](https://youtu.be/OKFf8J-eMIc) comparing Animate_X with UniAnimate 
+
+16/12/2024: Added three nodes and associated workflows for Animate-X: `Repose image with Animate_X` for img2img pose transfer, `Animate image with Animate_X` for img2vid generation, and `Animate image with Animate_X_Long` for long video generation. 
+Install or Update this repository with the ComfyUI Manager to get these nodes. You will need to download the `animate-x_ckpt.pth` model and place it in 'ComfyUI-UniAnimate-W/checkpoints/' folder to use these nodes. The other four checkpoints required are the same as those used by UniAnimate. 
+You can download the checkpoints here:https://huggingface.co/Shuaishuai0219/Animate-X/tree/main
+The code for Animate-X is almost the same as that for UniAnimate, so I decided to include the Animate-X nodes here rather than creating a new repository. The requirements are also the same.
+You can visit the Animate-X repo via this link: https://github.com/antgroup/animate-x
+
+
+
+09/09/2024: Released a [video](https://youtu.be/Ne-DSBhfg8A) on using the two new UniAnimate nodes for best results 
+
+07/09/2024: Added two nodes: `Animate image with UniAnimate_Long` for long video generation, and `Repose image with UniAnimate` for img2img pose transfer
 
 
 ## Getting Started
 
-The ComfyUI nodes created are `Align & Generate poses for UniAnimate` & `Animate image with UniAnimate`
-
-Update 07/09/2024: Added two nodes: `Animate image with UniAnimate_Long` for long video generation, and `Repose image with UniAnimate` for img2img pose transfer
-
-Update 09/09/2024: Released a [video](https://youtu.be/Ne-DSBhfg8A) on using the two new nodes for best results      
+The ComfyUI nodes created are `Align & Generate poses for UniAnimate` & `Animate image with UniAnimate`    
 
 I used a ComfyUI_windows_portable to test the nodes in a Windows 10 OS with 16GB RAM & 12GB VRAM Nvidia Graphics Card
 
 Download or clone this repository and place it in ComfyUI_windows_portable\ComfyUI\custom_nodes\. Or install via the ComfyUI Manager by searching for
 
 ```
-ComfyUI-UniAnimate-W
+UniAnimate Nodes for ComfyUI
 ```
 
 You will need python>=3.9 in your ComfyUI Environment.
@@ -76,12 +102,14 @@ Or move them via your command line interface:
 python mv ./checkpoints/iic/unianimate/* ./checkpoints/
 
 ```
+You can manually download the unianimate checkpoint from here: https://huggingface.co/camenduru/unianimate/tree/main
 
-All the models should be in the  '\Path-to-UniAnimate\checkpoints' folder as follows:
+All the models should be in the  '\Path-to-UniAnimate-W\checkpoints' folder as follows:
 
 
 ```
 ./checkpoints/
+|---- animate-x_ckpt.pth
 |---- dw-ll_ucoco_384.onnx
 |---- open_clip_pytorch_model.bin
 |---- unianimate_16f_32f_non_ema_223000.pth 
@@ -90,7 +118,7 @@ All the models should be in the  '\Path-to-UniAnimate\checkpoints' folder as fol
 
 ```
 
-You can now upload the workflow in your '\Path-to-UniAnimate\' folder which is titled 'basicUniAnimateWorkflow.json', install missing custom nodes with the ComfyUI Manager if necessary, upload a picture & video (You can use those in the 'assets' folder), and run!
+You can now upload the workflow in your '\Path-to-UniAnimate-W\' folder which is titled 'UniAnimateImg2Vid.json', install missing custom nodes with the ComfyUI Manager if necessary, upload a picture & video (You can use those in the 'assets' folder), and run!
 
 
 **<font color=red> Note </font>**:
@@ -101,7 +129,7 @@ You can now upload the workflow in your '\Path-to-UniAnimate\' folder which is t
 
 - > You can also generate a video first, and then upload the last frame of the video as a pic to generate the next frames with `useFirstFrame` set to true in the `Align & Generate poses for UniAnimate` node.
 
-- > Generating 32 frames of video with a resolution of [512, 768] usually takes about 7 minutes.
+- > Generating 32 frames of video with a resolution of [512, 768] usually takes about 7 minutes for unianimate & 8 minutes for animate-x.
 
 You can also change the pose of an image to that of another image as shown below.
 
@@ -114,6 +142,10 @@ You can watch a video on the Installation [here](https://youtu.be/NFnhELV4bG0)
 
 </div>
 
+## Support
+If you find this project helpful, you can support me here:  
+[![Buy Me a Coffee](https://img.shields.io/badge/Support-Buy%20Me%20a%20Coffee-orange?style=flat-square&logo=buy-me-a-coffee)](https://buymeacoffee.com/isiomo)
+
 ## Disclaimer
  
-I am not responsible for any user-generated content. Users are fully responsible for their actions when using these nodes and the generative model. Neither I nor the contributors to the UniAnimate project have any legal affiliation with or accountability for users' behaviors. It is crucial to use these nodes and the generative model responsibly, following both ethical and legal standards.
+I am not responsible for any user-generated content. Users are fully responsible for their actions when using these nodes and the generative models. Neither I nor the contributors to the UniAnimate and Animate-x projects have any legal affiliation with or accountability for users' behaviors. It is crucial to use these nodes and the generative models responsibly, following both ethical and legal standards.

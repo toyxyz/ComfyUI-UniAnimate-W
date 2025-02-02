@@ -202,6 +202,25 @@ def mp_main(dontAlignPose, reference_image, video):
     results_vis = []
     num_frames = video.size(0)
 
+    frames_numpy = video.permute(0, 2, 3, 1).cpu().numpy()
+
+    bodiesA = []
+    body_indices = []
+    hands = []
+    faces = []
+    fps = 30
+
+
+
+    refPose_data = {
+        "bodies": [],
+        "body_indices": [],
+        "faces": [],
+        "hands": [],
+        "size": [],
+        "fps": 30,
+    }
+
 
     for i in range(num_frames):
         logger.info(f"Processing frame {i + 1}/{num_frames}")
@@ -209,10 +228,25 @@ def mp_main(dontAlignPose, reference_image, video):
         frame = ((frame - frame.min()) / (frame.max() - frame.min()))*255 
         frame = np.flip(frame, axis=2)  
         pose = dw_func(i, frame, dwpose_model)
+        size = frame.shape # (1216, 832, 3)
+
+        bodiesA.append(pose['bodies']['candidate'][:18])
+        body_indices.append(pose['bodies']['subset'][0][:18])
+        faces.append(pose['faces'][0])
+        hands.append(pose['hands'])
+
         results_vis.append(pose)
 
     logger.info(f'All frames have been processed.')
     print(len(results_vis))
+
+    pose_data = {}
+    pose_data['bodies'] = np.array(bodiesA)
+    pose_data['body_indices'] = np.array(body_indices)
+    pose_data['faces'] = np.array(faces)
+    pose_data['hands'] = np.array(hands)
+    pose_data['size'] = size
+    pose_data['fps'] = fps
 
     vid_not_aligned = copy.deepcopy(results_vis)
 
@@ -221,7 +255,44 @@ def mp_main(dontAlignPose, reference_image, video):
     ref_frame = ((ref_frame - ref_frame.min()) / (ref_frame.max() - ref_frame.min()))*255
     ref_frame = np.flip(ref_frame, axis=2)
     pose_ref = dw_func(-1, ref_frame, dwpose_model)
+
+    refBody = pose_ref['bodies']['candidate'][:18]
+    refPose_data["bodies"]=pose_ref['bodies']['candidate'][:18]
+    refPose_data["body_indices"]=pose_ref['bodies']['subset'][0][:18]
+    refPose_data["faces"]=pose_ref['faces'][0]
+    refPose_data["hands"]=pose_ref['hands']
+    refPose_data["size"] = ref_frame.shape
+    refPose_data['fps'] = fps
+
+    refBody = np.array(refBody)  # Ensure refBody is a NumPy array
+    bodiesA = [np.array(body) for body in bodiesA]
+
+    # print(f"bodies looks like {bodiesA}")
+
+    # if isinstance(bodiesA, list) and all(isinstance(body, np.ndarray) for body in bodiesA):
+    #     bodiesB = bodiesA[0][:18]  # Extract the first 18 rows for the given index
+    # else:
+    #     raise TypeError(f"Expected pose_data to be a list of numpy.ndarray, got {type(bodiesA)}")
+
+    # print(f"refBody : {refBody}")
+    # print(f"bodies : {bodies}")
+
+    # if not isinstance(refBody, dict):
+    #     raise TypeError(f"Expected refBody to be a dict, got {type(refBody)}")
+
+    # if 'bodies' not in refBody or 'candidate' not in refBody['bodies']:
+    #     print(f"refBody keys: {refBody.keys()}")
+    #     raise KeyError("`refBody` does not contain the required key: 'bodies' or 'candidate'")
+    
+    # if not isinstance(bodies, dict):
+    #     raise TypeError(f"Expected bodies to be a dict, got {type(bodies)}")
+
+    # if 'bodies' not in bodies or 'candidate' not in bodies['bodies']:
+    #     print(f"bodies keys: {bodies.keys()}")
+    #     raise KeyError("`bodies` does not contain the required key: 'bodies' or 'candidate'")
+
     # print(f'The content of the image is currently: {pose_ref} ')
+
 
 
 
@@ -694,7 +765,8 @@ def mp_main(dontAlignPose, reference_image, video):
 
     dwpose_images = []
 
-    for i in range(len(results_vis)):     
+    for i in range(len(results_vis)):
+        
         if dontAlignPose:
             dwpose_woface, _ = draw_pose(vid_not_aligned[i], H=768, W=512)
         else:
@@ -713,7 +785,7 @@ def mp_main(dontAlignPose, reference_image, video):
     # print(f'The type of the pose from run_align_pose is currently of the form : {type(dwpose_ref_tensor)} ')
     # print(f'The content of the pose from run_align_pose is currently: {dwpose_ref_tensor} ')
     
-    return dwpose_images, dwpose_ref_tensor
+    return dwpose_images, dwpose_ref_tensor, bodiesA, refBody
 
 
 logger = get_logger('dw pose extraction')

@@ -47,12 +47,12 @@ from ...utils.assign_cfg import assign_signle_cfg
 from ...utils.distributed import generalized_all_gather, all_reduce
 from ...utils.video_op import save_i2vgen_video, save_t2vhigen_video_safe, save_video_multiple_conditions_not_gif_horizontal_3col
 from ...tools.modules.autoencoder import get_first_stage_encoding
-from ...utils.registry_class import INFER_ENGINE, MODEL, EMBEDDER, AUTO_ENCODER, DIFFUSION
+from ...utils.registry_class import INFER_ENGINE, MODEL2, EMBEDDER, AUTO_ENCODER, DIFFUSION
 from copy import copy
 
 
 # @INFER_ENGINE.register_function()
-def inference_unianimate_long_entrance(seed, steps, useFirstFrame, reference_image, refPose, pose_sequence, frame_interval, context_size, context_stride, context_overlap, max_frames, resolution, cfg_update,  **kwargs):
+def inference_animate_x_long_entrance(seed, steps, useFirstFrame, reference_image, refPose, pose_sequence, frame_interval, context_size, context_stride, context_overlap, max_frames, resolution, cfg_update,  **kwargs):
     for k, v in cfg_update.items():
         if isinstance(v, dict) and k in cfg:
             cfg[k].update(v)
@@ -217,10 +217,11 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
     try:
         if not is_libuv_supported():
             print("libuv is not supported, disabling USE_LIBUV")
-            os.environ["USE_LIBUV"] = "0"
+            os.environ["USE_LIBUV"] = "0"          
     except Exception as e:
         print(f"Unexpected error occured: {e}")
         os.environ["USE_LIBUV"] = "0"
+
 
     if not cfg.debug:
         torch.cuda.set_device(gpu)
@@ -248,7 +249,7 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
     #         logging.StreamHandler(stream=sys.stdout)])
     # logging.info(cfg)
     # logging.info(f"Running UniAnimate inference on gpu {gpu}")
-    print(f'Running UniAnimate inference on gpu ({gpu})')
+    print(f'Running Animate_X inference on gpu ({gpu})')
     cfg.resolution = resolution
     # [Diffusion]
     diffusion = DIFFUSION.build(cfg.Diffusion)
@@ -289,12 +290,14 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
     if "config" in cfg.UNet:
         cfg.UNet["config"] = cfg
     cfg.UNet["zero_y"] = zero_y
-    model = MODEL.build(cfg.UNet)
+    if max_frames > 32:
+        cfg.UNet["seq_len"] = max_frames+1
+    model = MODEL2.build(cfg.UNet)
 
     current_directory = os.path.dirname(os.path.abspath(__file__))
     parent_directory = os.path.dirname(current_directory)
     root_directory = os.path.dirname(parent_directory)
-    unifiedModel = os.path.join(root_directory, 'checkpoints/unianimate_16f_32f_non_ema_223000.pth')
+    unifiedModel = os.path.join(root_directory, 'checkpoints/animate-x_ckpt.pth')
     state_dict = torch.load(unifiedModel, map_location='cpu')
     if 'state_dict' in state_dict:
         state_dict = state_dict['state_dict']
@@ -302,7 +305,15 @@ def worker(gpu, seed, steps, useFirstFrame, reference_image, ref_pose, pose_sequ
         resume_step = state_dict['step']
     else:
         resume_step = 0
-    status = model.load_state_dict(state_dict, strict=True)
+    try:
+        status = model.load_state_dict(state_dict, strict=False)
+    except:
+
+        for key in list(state_dict.keys()):
+            if 'pose_embedding_before.pos_embed.pos_table' in key:  
+                del state_dict[key]
+        status = model.load_state_dict(state_dict, strict=False)
+    # status = model.load_state_dict(state_dict, strict=True)
     print(f'Load model from ({unifiedModel}) with status ({status})')
     model = model.to(gpu)
     model.eval()
